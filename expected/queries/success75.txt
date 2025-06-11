@@ -1,0 +1,4 @@
+1,SELECT * FROM users,true
+2,SELECT * FROM users,true
+3,SELECT * FROM users,true
+4,INVALID QUERY SYNTAX,false,Syntax error in query

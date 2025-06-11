@@ -1,0 +1,4 @@
+1,INVALID QUERY SYNTAX,false,Syntax error in query
+2,INVALID QUERY SYNTAX,false,Syntax error in query
+3,INVALID QUERY SYNTAX,false,Syntax error in query
+4,INVALID QUERY SYNTAX,false,Syntax error in query
