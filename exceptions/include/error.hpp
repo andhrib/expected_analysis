@@ -11,7 +11,12 @@ public:
         : std::runtime_error(message) {}
 };
 
-// Configuration related errors
+class IOError : public ProjectError {
+public:
+    explicit IOError(const std::string& message)
+        : ProjectError("IOError: " + message) {}
+};
+
 class ParseError : public ProjectError {
 public:
     explicit ParseError(const std::string& message)
@@ -24,14 +29,12 @@ public:
         : ProjectError("ValidationError: " + message) {}
 };
 
-// Connection related errors
 class ConnectionError : public ProjectError {
 public:
     explicit ConnectionError(const std::string& message)
         : ProjectError("ConnectionError: " + message) {}
 };
 
-// Query related errors
 class QueryError : public ProjectError {
 public:
     explicit QueryError(const std::string& message)

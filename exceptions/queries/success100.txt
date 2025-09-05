@@ -1,4 +1,4 @@
-1,SELECT * FROM users,true
-2,SELECT * FROM users,true
-3,SELECT * FROM users,true
-4,SELECT * FROM users,true
+1,SET user:1=Janez
+2,GET user:1
+3,GET user:1
+4,DELETE user:1

@@ -15,11 +15,12 @@ enum class ConnectionSuccess {
     PRIMARY_PERMANENT_FAILURE,
 };
 
-void program(benchmark::State& state, std::string configFilePath, std::string queryFilePath, int queryExecuteCount, ConnectionSuccess connectionSuccess = ConnectionSuccess::SUCCESS, int failureCount = 0) {
+void program(benchmark::State& state, std::string configFilePath, std::string queryFilePath, int queryExecuteCount, int depth = 0, ConnectionSuccess connectionSuccess = ConnectionSuccess::SUCCESS, int failureCount = 0) {
     try {
         AppConfig appConfig = ConfigLoader::loadConfig(configFilePath);
+        Server server;
 
-        ConnectionManager connectionManager = ConnectionManager(appConfig);
+        ConnectionManager connectionManager = ConnectionManager(appConfig, server);
         connectionManager.establishConnection();
         QueryEngine queryEngine = QueryEngine(connectionManager);
 
@@ -39,7 +40,7 @@ void program(benchmark::State& state, std::string configFilePath, std::string qu
 
         for (auto _ : state) {
             if (connectionManager.isConnected()) {
-                std::vector<QueryResult> results = queryEngine.executeQueries(queriesToRun);
+                std::vector<QueryResult> results = queryEngine.executeQueries(queriesToRun, depth);
 			    /*for (const auto& result : results) {
 				    result.print();
 			    }*/
@@ -48,10 +49,10 @@ void program(benchmark::State& state, std::string configFilePath, std::string qu
 
     }
     catch (const ParseError& e) {
-        std::cerr << "FATAL [Main]: Configuration Parse Error - " << e.what() << std::endl;
+        std::cerr << "FATAL [Main]: " << e.what() << std::endl;
     }
     catch (const ValidationError& e) {
-        std::cerr << "FATAL [Main]: Configuration Validation Error - " << e.what() << std::endl;
+        std::cerr << "FATAL [Main]: " << e.what() << std::endl;
     }
     catch (const std::runtime_error& e) {
         std::cerr << "FATAL [Main]: Runtime Error - " << e.what() << std::endl;
@@ -65,20 +66,34 @@ void program(benchmark::State& state, std::string configFilePath, std::string qu
 }
 
 BENCHMARK_CAPTURE(program, success100_100, "configs/example_primary.cfg", "queries/success100.txt", 25);
-BENCHMARK_CAPTURE(program, success75_100, "configs/example_primary.cfg", "queries/success75.txt", 25);
-BENCHMARK_CAPTURE(program, success50_100, "configs/example_primary.cfg", "queries/success50.txt", 25);
-BENCHMARK_CAPTURE(program, success25_100, "configs/example_primary.cfg", "queries/success25.txt", 25);
-BENCHMARK_CAPTURE(program, success0_100, "configs/example_primary.cfg", "queries/success0.txt", 25);
+//BENCHMARK_CAPTURE(program, success75_100, "configs/example_primary.cfg", "queries/success75.txt", 25);
+//BENCHMARK_CAPTURE(program, success50_100, "configs/example_primary.cfg", "queries/success50.txt", 25);
+//BENCHMARK_CAPTURE(program, success25_100, "configs/example_primary.cfg", "queries/success25.txt", 25);
+//BENCHMARK_CAPTURE(program, success0_100, "configs/example_primary.cfg", "queries/success0.txt", 25);
 
-BENCHMARK_CAPTURE(program, success100_500, "configs/example_primary.cfg", "queries/success100.txt", 125);
-BENCHMARK_CAPTURE(program, success75_500, "configs/example_primary.cfg", "queries/success75.txt", 125);
-BENCHMARK_CAPTURE(program, success50_500, "configs/example_primary.cfg", "queries/success50.txt", 125);
-BENCHMARK_CAPTURE(program, success25_500, "configs/example_primary.cfg", "queries/success25.txt", 125);
-BENCHMARK_CAPTURE(program, success0_500, "configs/example_primary.cfg", "queries/success0.txt", 125);
-
+//BENCHMARK_CAPTURE(program, success100_100_50, "configs/example_primary.cfg", "queries/success100.txt", 25, 50);
+//BENCHMARK_CAPTURE(program, success75_100_50, "configs/example_primary.cfg", "queries/success75.txt", 25, 50);
+//BENCHMARK_CAPTURE(program, success50_100_50, "configs/example_primary.cfg", "queries/success50.txt", 25, 50);
+//BENCHMARK_CAPTURE(program, success25_100_50, "configs/example_primary.cfg", "queries/success25.txt", 25, 50);
+//BENCHMARK_CAPTURE(program, success0_100_50, "configs/example_primary.cfg", "queries/success0.txt", 25, 50);
+//
+//BENCHMARK_CAPTURE(program, success100_100_500, "configs/example_primary.cfg", "queries/success100.txt", 25, 200);
+//BENCHMARK_CAPTURE(program, success75_100_500, "configs/example_primary.cfg", "queries/success75.txt", 25, 200);
+//BENCHMARK_CAPTURE(program, success50_100_500, "configs/example_primary.cfg", "queries/success50.txt", 25, 200);
+//BENCHMARK_CAPTURE(program, success25_100_500, "configs/example_primary.cfg", "queries/success25.txt", 25, 200);
+//BENCHMARK_CAPTURE(program, success0_100_500, "configs/example_primary.cfg", "queries/success0.txt", 25, 200);
+//
+//
+//BENCHMARK_CAPTURE(program, success100_500, "configs/example_primary.cfg", "queries/success100.txt", 125);
+//BENCHMARK_CAPTURE(program, success75_500, "configs/example_primary.cfg", "queries/success75.txt", 125);
+//BENCHMARK_CAPTURE(program, success50_500, "configs/example_primary.cfg", "queries/success50.txt", 125);
+//BENCHMARK_CAPTURE(program, success25_500, "configs/example_primary.cfg", "queries/success25.txt", 125);
+//BENCHMARK_CAPTURE(program, success0_500, "configs/example_primary.cfg", "queries/success0.txt", 125);
+//
 BENCHMARK_CAPTURE(program, success100_1000, "configs/example_primary.cfg", "queries/success100.txt", 250);
 BENCHMARK_CAPTURE(program, success75_1000, "configs/example_primary.cfg", "queries/success75.txt", 250);
 BENCHMARK_CAPTURE(program, success50_1000, "configs/example_primary.cfg", "queries/success50.txt", 250);
 BENCHMARK_CAPTURE(program, success25_1000, "configs/example_primary.cfg", "queries/success25.txt", 250);
 BENCHMARK_CAPTURE(program, success0_1000, "configs/example_primary.cfg", "queries/success0.txt", 250);
+
 BENCHMARK_MAIN();

@@ -13,9 +13,12 @@
 // Represents a single query to be executed
 struct Query {
     int id;
-    std::string queryString;
-    bool simulateSuccess = true;
-    std::string simulatedErrorMsg = "Simulated query failure";
+    enum class Type { GET, SET, DELETE };
+
+    Type type;
+    std::string rawCommand;
+    std::string key;
+    std::optional<std::string> value;
 };
 
 // Represents the result of a single query
@@ -49,13 +52,10 @@ public:
 
     // Executes a batch of queries, potentially in parallel
     // Returns a vector of QueryResult. Each QueryResult indicates success/failure.
-    std::vector<QueryResult> executeQueries(const std::vector<Query>& queries);
+    std::vector<QueryResult> executeQueries(const std::vector<Query>& queries, int depth);
 
 private:
-    // Executes a single query.
-    // This function will internally handle std::expected from ConnectionManager
-    // and populate QueryResult accordingly.
-    QueryResult executeSingleQuery(const Query& query);
+    QueryResult executeSingleQuery(const Query& query, int depth);
 
     ConnectionManager& connectionManager;
 };

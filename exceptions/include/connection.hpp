@@ -2,7 +2,7 @@
 #define CONNECTION_HPP
 
 #include "config.hpp" 
-#include "error.hpp" 
+#include "server.hpp"
 #include <string>
 #include <memory> 
 #include <mutex> 
@@ -42,7 +42,7 @@ enum class ConnectionMode {
 
 class ConnectionManager {
 public:
-    explicit ConnectionManager(const AppConfig& appConfig) : config(appConfig), currentMode(ConnectionMode::DISCONNECTED) {}
+    explicit ConnectionManager(const AppConfig& appConfig, Server& svr) : config(appConfig), server(svr), currentMode(ConnectionMode::DISCONNECTED) {}
 
     // Attempts to establish a connection, trying primary then backup, with retries.
     // Falls back to offline cache mode if all attempts fail.
@@ -52,8 +52,7 @@ public:
     ConnectionMode getCurrentMode() const;
     std::string getCurrentServerAddress() const;
 
-    // Simulates sending data - requires an active connection
-    void sendData(const std::string& data);
+    QueryResult executeRemoteQuery(const Query& query, int depth);
 
     // Simulate different failure modes for testing
     static void setSimulatedFailureMode(const std::string& serverType, int failureCount = 0, bool transient = false);
@@ -68,10 +67,10 @@ private:
 	// Attempts to connect to a server with retries and exponential backoff
     std::unique_ptr<NetworkResource> connectToServerWithRetries(const std::string& address, int port, int maxRetries, int baseDelayMs, const std::string& serverType);
 
-    AppConfig config;
+    const AppConfig& config;
     ConnectionMode currentMode;
     std::unique_ptr<NetworkResource> activeConnection;
-    std::mutex connectionMutex; // To protect shared state like activeConnection and currentMode
+    Server& server;
 
     // Simulation parameters (for testing)
     struct FailureSimConfig {

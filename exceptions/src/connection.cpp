@@ -1,4 +1,6 @@
 #include "connection.hpp"
+#include "query.hpp"
+#include "error.hpp"
 #include <stdexcept> 
 #include <thread>    
 #include <chrono>    
@@ -64,8 +66,6 @@ std::unique_ptr<NetworkResource> ConnectionManager::connectToServer(const std::s
 }
 
 void ConnectionManager::establishConnection() {
-    std::lock_guard<std::mutex> lock(connectionMutex);
-
     if (currentMode != ConnectionMode::DISCONNECTED) {
         return;
     }
@@ -85,7 +85,7 @@ void ConnectionManager::establishConnection() {
         currentMode = ConnectionMode::PRIMARY;
         return; // Success
     }
-	catch (const ConnectionError& e) {
+	catch (const ConnectionError& _) {
         // Try Backup Server if Primary failed
         try {
             activeConnection = connectToServerWithRetries(
@@ -98,7 +98,7 @@ void ConnectionManager::establishConnection() {
             currentMode = ConnectionMode::BACKUP;
             return; // Success
         }
-        catch (const ConnectionError& e) {
+        catch (const ConnectionError& _) {
             currentMode = ConnectionMode::DISCONNECTED;
             activeConnection.reset();
         }
@@ -163,11 +163,16 @@ std::string ConnectionManager::getCurrentServerAddress() const {
     }
 }
 
-void ConnectionManager::sendData(const std::string& data) {
-    std::lock_guard<std::mutex> lock(connectionMutex); // Protect access to activeConnection
+QueryResult ConnectionManager::executeRemoteQuery(const Query& query, int depth) {
     if (!isConnected()) {
-        throw ConnectionError("Cannot send data: Not connected.");
+        return QueryResult{
+            query.id,
+            false,
+            "",
+            "No active connection for executing query ID " + std::to_string(query.id),
+            std::chrono::milliseconds(0)
+        };
     }
-    // Simulate sending data
-    std::this_thread::sleep_for(std::chrono::milliseconds(2));
+
+    return server.processCommand(query, depth);
 }

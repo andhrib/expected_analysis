@@ -13,9 +13,10 @@ find_package(Threads REQUIRED)
 find_package(benchmark REQUIRED PATHS "../benchmark-main/build")
 
 add_executable(app "src/main.cpp"         
-                   src/config.cpp
-                   src/connection.cpp
-                   src/query.cpp      
+                   "src/config.cpp"
+                   "src/connection.cpp"
+                   "src/query.cpp" 
+                   "src/server.cpp"
 )
 target_link_libraries(app PRIVATE Threads::Threads benchmark::benchmark benchmark::benchmark_main)
 

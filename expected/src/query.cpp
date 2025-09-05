@@ -18,99 +18,79 @@ void QueryResult::print() const {
     }
 }
 
-// Helper function for executeSingleQuery to structure error handling
-// Returns a success indicator (e.g., data string) or an error.
-static std::expected<std::string, ErrorInfo> performQueryWork(ConnectionManager& connManager, const Query& query) {
-    // Simulate query execution work
-    std::this_thread::sleep_for(std::chrono::milliseconds(5 + (rand() % 10)));
-
-    if (!query.simulateSuccess) {
-        return std::unexpected(ErrorInfo{
-            ErrorCode::SimulatedQueryFailure,
-            query.simulatedErrorMsg + " (Query ID: " + std::to_string(query.id) });
-    }
-
-    // Simulate sending data via connection manager
-    auto sendDataResult = connManager.sendData("QUERY:" + query.queryString);
-    if (!sendDataResult) {
-        // Propagate the error from sendData, possibly mapping it to a Query-specific error context
-        ErrorInfo& originalError = sendDataResult.error();
-        return std::unexpected(ErrorInfo{
-            ErrorCode::ConnectionErrorDuringQuery,
-            "ConnectionError during query ID " + std::to_string(query.id) + ": " + originalError.message,
-            originalError.lineNumber
-            });
-    }
-
-    return "Result data for query ID " + std::to_string(query.id) + ": '" + query.queryString + "'";
-}
-
-
-QueryResult QueryEngine::executeSingleQuery(const Query& query) {
+QueryResult QueryEngine::executeSingleQuery(const Query& query, int depth) {
     QueryResource qResource(query.id);
 
     auto startTime = std::chrono::high_resolution_clock::now();
-    QueryResult result;
-    result.queryId = query.id;
-    result.result = performQueryWork(connectionManager, query);
+    QueryResult result = connectionManager.executeRemoteQuery(query, depth);
     auto endTime = std::chrono::high_resolution_clock::now();
-    result.executionTime = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+    if (result.result)
+        result.executionTime = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
 
     return result;
 }
 
 std::vector<Query> QueryEngine::parseQueriesFromFile(const std::string& filePath) {
+    auto parseLine = [](const std::string& line, int lineNumber) -> std::expected<Query, ErrorInfo> {
+        std::stringstream ss(line);
+        std::string id_token, command_token;
+        Query q;
+        if (!std::getline(ss, id_token, ','))
+			return std::unexpected(ErrorInfo{ ErrorCode::ParseError, "Missing ID!", lineNumber });
+        q.id = std::stoi(id_token);
+        if (!std::getline(ss, command_token))
+			return std::unexpected(ErrorInfo{ ErrorCode::ParseError, "Missing command!", lineNumber });
+        q.rawCommand = command_token;
+        std::stringstream command_ss(q.rawCommand);
+        std::string type_str;
+        command_ss >> type_str;
+        if (type_str == "GET") {
+            q.type = Query::Type::GET;
+            command_ss >> q.key;
+        }
+        else if (type_str == "SET") {
+            q.type = Query::Type::SET;
+            std::string pair;
+            command_ss >> pair;
+            size_t eq_pos = pair.find('=');
+            if (eq_pos == std::string::npos)
+				return std::unexpected(ErrorInfo{ ErrorCode::ParseError, "Malformed SET", lineNumber });
+            q.key = pair.substr(0, eq_pos);
+            q.value = pair.substr(eq_pos + 1);
+        }
+        else if (type_str == "DELETE") {
+            q.type = Query::Type::DELETE;
+            command_ss >> q.key;
+        }
+        else {
+			return std::unexpected(ErrorInfo{ ErrorCode::ParseError, "Invalid command type", lineNumber });
+        }
+        if (q.key.empty())
+			return std::unexpected(ErrorInfo{ ErrorCode::ParseError, "Missing key", lineNumber });
+        return q;
+	}; 
+
     std::ifstream file(filePath);
     if (!file.is_open()) {
         throw std::runtime_error("Error: Could not open file " + filePath);
     }
-
     std::vector<Query> queries;
     std::string line;
     int lineNumber = 0;
-
     while (std::getline(file, line)) {
-        lineNumber++;
-        std::stringstream ss(line);
-        std::string token;
-        Query q;
-
-        // 1. Parse ID
-        if (!std::getline(ss, token, ',')) {
-            std::cerr << ("Skipping malformed line " + std::to_string(lineNumber) + ". Missing ID!");
-            continue;
+		auto result = parseLine(line, ++lineNumber);
+        if (result) {
+            queries.push_back(result.value());
         }
-        q.id = std::stoi(token);
-
-        // 2. Parse Query String
-        if (!std::getline(ss, token, ',')) {
-            std::cerr << ("Skipping malformed line " + std::to_string(lineNumber) + ". Missing query string!");
-            continue;
+        else {
+            ErrorInfo err = result.error();
+            std::cerr << "Skipping malformed line " << lineNumber << ": " << err.fullMessage() << std::endl;
         }
-        q.queryString = token;
-
-        // 3. Parse Simulate Success flag
-        if (!std::getline(ss, token, ',')) {
-            std::cerr << ("Skipping malformed line " + std::to_string(lineNumber) + ". Missing simulate success flag!");
-            continue;
-        }
-        q.simulateSuccess = token == "true";
-
-        // 4. Parse optional Simulated Error Message
-        if (std::getline(ss, token)) {
-            if (!q.simulateSuccess && !token.empty()) {
-                q.simulatedErrorMsg = token;
-            }
-        }
-
-        queries.push_back(q);
     }
-
-    file.close();
     return queries;
 }
 
-std::vector<QueryResult> QueryEngine::executeQueries(const std::vector<Query>& queries) {
+std::vector<QueryResult> QueryEngine::executeQueries(const std::vector<Query>&queries, int depth) {
     if (queries.empty()) {
         return {};
     }
@@ -118,10 +98,8 @@ std::vector<QueryResult> QueryEngine::executeQueries(const std::vector<Query>& q
     std::vector<QueryResult> results;
 
     for (const auto& query : queries) {
-        futures.push_back(std::async(std::launch::async, [this, query]() {
-            return executeSingleQuery(query);
-            // If executeSingleQuery itself could throw non-std::expected critical errors (e.g. bad_alloc),
-            // they would be caught by future.get()
+        futures.push_back(std::async(std::launch::async, [this, query, depth]() {
+            return executeSingleQuery(query, depth);
             }));
     }
 
@@ -130,15 +108,12 @@ std::vector<QueryResult> QueryEngine::executeQueries(const std::vector<Query>& q
             results.push_back(futures[i].get());
         }
         catch (const std::exception& e) {
-            // This catch block is now primarily for unexpected exceptions not converted to ErrorInfo
-            // by executeSingleQuery's internal logic (e.g., std::bad_alloc from async infrastructure or deeper).
-            // Recoverable errors handled by std::expected within performQueryWork should already be in QueryResult.
             QueryResult errorResult;
             errorResult.queryId = (i < queries.size()) ? queries[i].id : -1;
 			errorResult.result = std::unexpected(ErrorInfo{
 				ErrorCode::UnknownError,
 				"Future resolution failed due to unexpected exception: " + std::string(e.what()),
-				0 // No specific line number for this error
+				-1 // No specific line number for this error
 				});
             errorResult.executionTime = std::chrono::milliseconds(0);
             results.push_back(errorResult);

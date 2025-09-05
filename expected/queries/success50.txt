@@ -1,4 +1,4 @@
-1,SELECT * FROM users,true
-2,SELECT * FROM users,true
-3,INVALID QUERY SYNTAX,false,Syntax error in query
-4,INVALID QUERY SYNTAX,false,Syntax error in query
+1,SET user:1=Janez
+2,GET user:2
+3,GET user:3
+4,DELETE user:1

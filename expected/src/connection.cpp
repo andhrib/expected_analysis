@@ -1,4 +1,5 @@
 #include "connection.hpp"
+#include "query.hpp"
 #include <thread>   
 #include <chrono>
 #include <cmath>  
@@ -68,8 +69,6 @@ std::expected<std::unique_ptr<NetworkResource>, ErrorInfo> ConnectionManager::co
 }
 
 std::expected<void, ErrorInfo> ConnectionManager::establishConnection() {
-    std::lock_guard<std::mutex> lock(connectionMutex);
-
     if (currentMode != ConnectionMode::DISCONNECTED) {
         return {}; 
     }
@@ -170,13 +169,17 @@ std::string ConnectionManager::getCurrentServerAddress() const {
     }
 }
 
-std::expected<void, ErrorInfo> ConnectionManager::sendData(const std::string& data) {
-    std::lock_guard<std::mutex> lock(connectionMutex);
+QueryResult ConnectionManager::executeRemoteQuery(const Query& query, int depth) {
     if (!isConnected()) {
-        return std::unexpected(ErrorInfo{
-            ErrorCode::NotConnected,
-            "Cannot send data: Not connected." });
+        return QueryResult{
+            query.id,
+            std::unexpected(ErrorInfo{
+                ErrorCode::NoActiveConnectionForQuery,
+                "No active connection for executing query ID " + std::to_string(query.id)
+            }),
+            std::chrono::milliseconds(0)
+        };
     }
-    std::this_thread::sleep_for(std::chrono::milliseconds(2)); // Simulate sending data
-    return {};
+
+    return server.processCommand(query, depth);
 }

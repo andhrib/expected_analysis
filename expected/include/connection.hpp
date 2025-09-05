@@ -4,9 +4,9 @@
 
 #include "config.hpp" 
 #include "error.hpp" 
+#include "server.hpp"
 #include <string>
-#include <memory>    
-#include <mutex>     
+#include <memory>        
 #include <expected>  
 
 
@@ -42,7 +42,7 @@ enum class ConnectionMode {
 
 class ConnectionManager {
 public:
-    explicit ConnectionManager(const AppConfig& appConfig) : config(appConfig), currentMode(ConnectionMode::DISCONNECTED) {}
+    explicit ConnectionManager(const AppConfig& appConfig, Server& svr) : config(appConfig), server(svr), currentMode(ConnectionMode::DISCONNECTED) {}
 
     // Attempts to establish a connection. Returns void on success, ErrorInfo if it ends in OFFLINE_CACHE or DISCONNECTED after all attempts.
     // Note: The internal state (currentMode) reflects the outcome. This function's error primarily signals failure to get *any* server.
@@ -52,9 +52,7 @@ public:
     ConnectionMode getCurrentMode() const;
     std::string getCurrentServerAddress() const;
 
-    // Simulates sending data - requires an active connection
-    // Returns void on success, ErrorInfo on failure (e.g., not connected).
-    std::expected<void, ErrorInfo> sendData(const std::string& data);
+    QueryResult executeRemoteQuery(const Query& query, int depth);
 
     static void setSimulatedFailureMode(const std::string& serverType, int failureCount = 0, bool transient = false);
 
@@ -67,7 +65,7 @@ private:
     AppConfig config;
     ConnectionMode currentMode;
     std::unique_ptr<NetworkResource> activeConnection;
-    std::mutex connectionMutex;
+    Server& server;
 
     struct FailureSimConfig {
         int failureCount = 0;

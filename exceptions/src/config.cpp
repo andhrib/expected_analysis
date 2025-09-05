@@ -18,7 +18,7 @@ std::string trim(const std::string& str) {
 AppConfig ConfigLoader::loadConfig(const std::string& filePath) {
     std::ifstream configFile(filePath);
     if (!configFile.is_open()) {
-        throw std::runtime_error("Failed to open configuration file: " + filePath);
+        throw IOError("Failed to open configuration file: " + filePath);
     }
 
     AppConfig config;
@@ -54,7 +54,6 @@ std::pair<std::string, std::string> ConfigLoader::parseLine(const std::string& l
     if (key.empty()) {
         throw ParseError("Malformed line " + std::to_string(lineNumber) + ": Key is empty. Line: '" + line + "'");
     }
-    // Value can be empty, validation for that should be in validateAndApply
 
     return { std::move(key), std::move(value) };
 }
@@ -89,15 +88,12 @@ void ConfigLoader::validateAndApply(AppConfig& config, const std::unordered_map<
         return valInt;
         };
 
-    // Required parameters
     config.primaryServerAddress = getValue("primary_server_address");
     config.primaryServerPort = getIntValue("primary_server_port", 1, 65535);
 
     config.backupServerAddress = getValue("backup_server_address");
     config.backupServerPort = getIntValue("backup_server_port", 1, 65535);
 
-    // Optional parameters with defaults handled by AppConfig constructor
-    // or could be explicitly checked here
     if (rawConfig.count("connection_retries")) {
         config.connectionRetries = getIntValue("connection_retries", 0, 100);
     }
@@ -106,7 +102,6 @@ void ConfigLoader::validateAndApply(AppConfig& config, const std::unordered_map<
         config.connectionTimeoutMs = getIntValue("connection_timeout_ms", 100, 60000);
     }
 
-    // Example of a custom semantic validation: primary and backup cannot be the same
     if (config.primaryServerAddress == config.backupServerAddress && config.primaryServerPort == config.backupServerPort) {
         throw ValidationError("Primary and backup server addresses and ports cannot be identical.");
     }

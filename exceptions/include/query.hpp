@@ -1,23 +1,24 @@
 #ifndef QUERY_HPP
 #define QUERY_HPP
 
-#include "connection.hpp" // For ConnectionManager
-#include "error.hpp"      // For QueryError
+#include "connection.hpp" 
+#include "error.hpp"     
 #include <string>
 #include <vector>
 #include <future>       
 #include <memory>         
-#include <chrono>        
+#include <chrono>
+#include <optional>
 
 // Represents a single query to be executed
 struct Query {
     int id;
-    std::string queryString;
-    // Add other query-specific parameters if needed
+    enum class Type { GET, SET, DELETE };
 
-    // For testing: instruct this query to succeed or fail
-    bool simulateSuccess = true;
-    std::string simulatedErrorMsg = "Simulated query failure";
+    Type type;
+    std::string rawCommand;
+    std::string key;
+    std::optional<std::string> value;
 };
 
 // Represents the result of a single query
@@ -54,14 +55,10 @@ public:
     explicit QueryEngine(ConnectionManager& connManager) : connectionManager(connManager) {}
 
     std::vector<Query> parseQueriesFromFile(const std::string& filePath);
-
-    // Executes a batch of queries, potentially in parallel
-    std::vector<QueryResult> executeQueries(const std::vector<Query>& queries);
+    std::vector<QueryResult> executeQueries(const std::vector<Query>& queries, int depth);
 
 private:
-    // Executes a single query
-    // This will be called by the parallel execution logic
-    QueryResult executeSingleQuery(const Query& query);
+    QueryResult executeSingleQuery(const Query& query, int depth);
 
     ConnectionManager& connectionManager;
 };
